@@ -1,0 +1,27 @@
+[project]
+name = "vision-attention"
+version = "0.1.0"
+description = "TODO"
+readme = "README.md"
+authors = [
+    { name = "Jamie Temple", email = "jamie.c.temple@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "einops>=0.8.1",
+    "numpy>=2.2.3",
+    "torch>=2.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/transformer",
+]
