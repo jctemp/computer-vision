@@ -15,14 +15,14 @@ class WindowPartition3d(nn.Module):
             volume_size.height // kernel_size.height,
             volume_size.width // kernel_size.width,
         )
-        assert volume_size.divisible_by(
-            kernel_size
-        ), f"Not all dimensions are divisible by kernel, received: {volume_size} and {kernel_size}"
+        assert volume_size.divisible_by(kernel_size), (
+            f"Not all dimensions are divisible by kernel, received: {volume_size} and {kernel_size}"
+        )
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
-        assert (
-            len(tensor.size()) == 5
-        ), f"Require a volume with channels and batch (BCDHW), received: {tensor.shape}"
+        assert len(tensor.size()) == 5, (
+            f"Require a volume with channels and batch (BCDHW), received: {tensor.shape}"
+        )
 
         kernel_depth = self.kernel_size.depth
         kernel_height = self.kernel_size.height
@@ -49,14 +49,14 @@ class WindowReverse3d(nn.Module):
             volume_size.height // kernel_size.height,
             volume_size.width // kernel_size.width,
         )
-        assert volume_size.divisible_by(
-            kernel_size
-        ), f"Not all dimensions are divisible by kernel, received: {volume_size} and {kernel_size}"
+        assert volume_size.divisible_by(kernel_size), (
+            f"Not all dimensions are divisible by kernel, received: {volume_size} and {kernel_size}"
+        )
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
-        assert (
-            len(tensor.size()) == 4
-        ), f"Require a sequence (BWLE), received: {tensor.shape}"
+        assert len(tensor.size()) == 4, (
+            f"Require a sequence (BWLE), received: {tensor.shape}"
+        )
 
         depth = self.window_size.depth
         height = self.window_size.height

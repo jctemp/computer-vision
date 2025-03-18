@@ -104,15 +104,15 @@ class Concat3d(nn.Module):
                 ),
             )
 
-            assert (
-                tensor.size(-3) % kernel_depth == 0
-            ), f"Padding leads to invalid image dimensions, got: {tensor.size(-3) % kernel_depth}"
-            assert (
-                tensor.size(-2) % kernel_height == 0
-            ), f"Padding leads to invalid image dimensions, got: {tensor.size(-2) % kernel_height}"
-            assert (
-                tensor.size(-1) % kernel_width == 0
-            ), f"Padding leads to invalid image dimensions, got: {tensor.size(-1) % kernel_width}"
+            assert tensor.size(-3) % kernel_depth == 0, (
+                f"Padding leads to invalid image dimensions, got: {tensor.size(-3) % kernel_depth}"
+            )
+            assert tensor.size(-2) % kernel_height == 0, (
+                f"Padding leads to invalid image dimensions, got: {tensor.size(-2) % kernel_height}"
+            )
+            assert tensor.size(-1) % kernel_width == 0, (
+                f"Padding leads to invalid image dimensions, got: {tensor.size(-1) % kernel_width}"
+            )
 
         tensor = rearrange(
             tensor,
