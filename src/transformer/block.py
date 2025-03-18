@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -8,7 +8,6 @@ from .modules import (
     WindowPartition3d,
     WindowReverse3d,
     WindowShift3d,
-    LayerNorm3d,
     FeedForwardNetwork,
     DropPath,
 )
@@ -18,8 +17,8 @@ from .utils import Dimensions3d
 class SwinBlock3D(nn.Module):
     def __init__(
         self,
-        volume_size: Dimensions3d,
-        kernel_size: Dimensions3d,
+        volume_size: Dimensions3d | Tuple[int, int, int],
+        kernel_size: Dimensions3d | Tuple[int, int, int],
         embedding_dim: int,
         projection_dim: int = 256,
         heads: int = 8,
@@ -27,14 +26,25 @@ class SwinBlock3D(nn.Module):
         drop_attn: float = 0.1,
         drop_proj: float = 0.1,
         drop_path: float = 0.1,
-        mlp_factor: int = 3,
+        mlp_ratio: int = 3,
         shifted: bool = False,
         enable_sampling: bool = False,
     ) -> None:
         super().__init__()
 
-        self.volume_size = volume_size
-        self.kernel_size = kernel_size
+        self.in_channels = embedding_dim
+        self.out_channels = embedding_dim
+
+        self.volume_size = (
+            volume_size
+            if isinstance(volume_size, Dimensions3d)
+            else Dimensions3d.fromtuple(volume_size)
+        )
+        self.kernel_size = (
+            kernel_size
+            if isinstance(kernel_size, Dimensions3d)
+            else Dimensions3d.fromtuple(kernel_size)
+        )
         self.shifted = shifted
         self.enable_sampling = enable_sampling
 
@@ -60,25 +70,22 @@ class SwinBlock3D(nn.Module):
             drop_proj=drop_proj,
             enable_sampling=enable_sampling,
         )
-        self.norm_attn = LayerNorm3d(embedding_dim)
+        self.norm_attn = nn.LayerNorm(embedding_dim)
 
         self.mlp = FeedForwardNetwork(
             in_channels=embedding_dim,
-            hidden_channels=embedding_dim * mlp_factor,
+            hidden_channels=embedding_dim * mlp_ratio,
             enable_sampling=enable_sampling,
         )
-        self.norm_mlp = LayerNorm3d(embedding_dim)
+        self.norm_mlp = nn.LayerNorm(embedding_dim)
 
         self.drop_path = DropPath(p=drop_path, enable_sampling=enable_sampling)
 
         self.register_buffer(
             "indices",
-            Dimensions3d.compute_relative_positions(self.volume_size),
+            Dimensions3d.compute_relative_positions(self.kernel_size),
         )
-        self.register_buffer(
-            "mask",
-            self.partition(self.shift.mask),
-        )
+        self.register_buffer("mask", self.shift.mask)
 
     def forward(
         self,

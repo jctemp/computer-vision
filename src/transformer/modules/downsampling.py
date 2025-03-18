@@ -135,45 +135,67 @@ class Downsample(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        volume_size: Dimensions3d,
-        kernel_size: Dimensions3d,
+        volume_size: Dimensions3d | Tuple[int, int, int],
+        kernel_size: Dimensions3d | Tuple[int, int, int],
         bias: bool = True,
-        type: str = "con",
+        type: str = "concat",
     ) -> None:
         super().__init__()
 
-        self.volume_size = volume_size
-        self.kernel_size = kernel_size
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.volume_size = (
+            volume_size
+            if isinstance(volume_size, Dimensions3d)
+            else Dimensions3d.fromtuple(volume_size)
+        )
+        self.kernel_size = (
+            kernel_size
+            if isinstance(kernel_size, Dimensions3d)
+            else Dimensions3d.fromtuple(kernel_size)
+        )
         self.bias = bias
 
         self.pooler = None
         if type == "max":
             self.pooler = nn.MaxPool3d(
-                kernel_size=kernel_size.to_tuple(),
-                stride=kernel_size.to_tuple(),
+                kernel_size=self.kernel_size.to_tuple(),
+                stride=self.kernel_size.to_tuple(),
             )
         elif type == "avg":
             self.pooler = nn.AvgPool3d(
-                kernel_size=kernel_size.to_tuple(),
-                stride=kernel_size.to_tuple(),
+                kernel_size=self.kernel_size.to_tuple(),
+                stride=self.kernel_size.to_tuple(),
             )
-        elif type == "cnn":
+        elif type == "conv":
             self.pooler = nn.Conv3d(
                 in_channels=in_channels,
                 out_channels=out_channels,
-                kernel_size=kernel_size.to_tuple(),
-                stride=kernel_size.to_tuple(),
+                kernel_size=self.kernel_size.to_tuple(),
+                stride=self.kernel_size.to_tuple(),
             )
-        elif type == "con":
+        elif type == "concat":
             self.pooler = Concat3d(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=self.kernel_size.to_tuple(),
-                stride=kernel_size.to_tuple(),
+                stride=self.kernel_size.to_tuple(),
             )
         else:
-            raise TypeError()
+            raise TypeError(f"type={type} is unknown, use: max, avg, conv, concat")
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = self.pooler(tensor)
         return tensor
+
+    def reduced_output(self, dim: Dimensions3d | Tuple[int, int, int]) -> Dimensions3d:
+        dim = dim if isinstance(dim, Dimensions3d) else Dimensions3d.fromtuple(dim)
+
+        assert dim.divisible_by(self.kernel_size), "dim is not divisible"
+
+        return Dimensions3d(
+            dim.depth // self.kernel_size.depth,
+            dim.height // self.kernel_size.height,
+            dim.width // self.kernel_size.width,
+        )

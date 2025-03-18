@@ -11,8 +11,13 @@ class Dimensions3d:
     height: int
     width: int
 
-    def fromvalue(self, value: int) -> Self:
+    @staticmethod
+    def fromvalue(value: int) -> Self:
         return Dimensions3d(value, value, value)
+
+    @staticmethod
+    def fromtuple(value: Tuple[int, int, int]) -> Self:
+        return Dimensions3d(value[0], value[1], value[2])
 
     def num_elements(self) -> int:
         return self.depth * self.height * self.width
@@ -77,9 +82,9 @@ class Dimensions3d:
         relative_width = indices_width.unsqueeze(0) - indices_width.unsqueeze(1)
 
         if norm:
-            relative_depth /= self.depth - 1
-            relative_height /= self.height - 1
-            relative_width /= self.width - 1
+            relative_depth /= self.depth - 1 if self.depth > 1 else self.depth
+            relative_height /= self.height - 1 if self.height > 1 else self.height
+            relative_width /= self.width - 1 if self.width > 1 else self.width
 
         coords = torch.stack([relative_depth, relative_height, relative_width], dim=-1)
 

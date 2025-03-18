@@ -76,7 +76,7 @@ class WindowAttention3d(nn.Module):
         # 2. Cosine-similarity
         norm_query = nnf.normalize(proj_query, dim=-1)
         norm_key = nnf.normalize(proj_key, dim=-1)
-        attention: torch.Tensor = einsum(
+        context: torch.Tensor = einsum(
             norm_query, norm_key, "b h n c, b h m c -> b h n m"
         ) / self.scale.clamp(min=0.01)
 
@@ -89,17 +89,17 @@ class WindowAttention3d(nn.Module):
         )
         bias = 16 * torch.sigmoid(self.cpb_mlp(log_indices))
         bias = rearrange(bias, "l s h -> 1 h l s")
-        attention += bias
+        context += bias
 
         # 4. masking
         if mask is not None:
             # b h n m -> b bw h n m
-            attention = rearrange(attention, "(b bw) ... -> b bw ...", bw=bw)
-            attention = attention.masked_fill_(mask, -1e5)
-            attention = rearrange(attention, "b bw ... -> (b bw) ...", bw=bw)
+            context = rearrange(context, "(b bw) ... -> b bw ...", bw=bw)
+            context = context.masked_fill_(mask, -1e5)
+            context = rearrange(context, "b bw ... -> (b bw) ...", bw=bw)
 
         # 5. Compute coefficients
-        attention = nnf.softmax(attention, dim=-1)
+        attention = nnf.softmax(context, dim=-1)
         self.attention = attention
         attention = nnf.dropout(
             attention,
