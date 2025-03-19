@@ -31,9 +31,6 @@
               pkgs."python${version}"
               pkgs."python${version}Packages".pip
 
-              # pkgs.cudaPackages.cudatoolkit
-              # (pkgs.cudaPackages.cudnn.override {autoAddDriverRunpath = pkgs.autoAddDriverRunpath;})
-
               (pkgs.vscode-with-extensions.override {
                 vscodeExtensions = [
                   pkgs.vscode-extensions.ms-python.python
