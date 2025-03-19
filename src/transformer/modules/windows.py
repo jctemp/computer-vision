@@ -16,7 +16,7 @@ class WindowPartition3d(nn.Module):
             volume_size.width // kernel_size.width,
         )
         assert volume_size.divisible_by(kernel_size), (
-            f"Not all dimensions are divisible by kernel, received: {volume_size} and {kernel_size}"
+            f"Not all dimensions are divisible by kernel, received: volume_size={volume_size} and kernel_size={kernel_size}"
         )
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:

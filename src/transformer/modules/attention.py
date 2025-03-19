@@ -42,7 +42,8 @@ class WindowAttention3d(nn.Module):
         self.proj_v = nn.Linear(embedding_dim, self.projection_dim * heads, False)
         self.proj_w = nn.Linear(self.projection_dim * heads, embedding_dim)
 
-        self.scale = nn.Parameter(torch.ones(1))
+        self.scale = 1.0 / self.embedding_dim**0.5
+        # self.scale = nn.Parameter(torch.ones(1))
         self.cpb_mlp = nn.Sequential(
             nn.Linear(3, 512), nn.ReLU(inplace=True), nn.Linear(512, heads)
         )
@@ -73,12 +74,10 @@ class WindowAttention3d(nn.Module):
             self.proj_v(value), "b l (h e) -> b h l e", h=self.heads
         )
 
-        # 2. Cosine-similarity
-        norm_query = nnf.normalize(proj_query, dim=-1)
-        norm_key = nnf.normalize(proj_key, dim=-1)
-        context: torch.Tensor = einsum(
-            norm_query, norm_key, "b h n c, b h m c -> b h n m"
-        ) / self.scale.clamp(min=0.01)
+        # 2. Context computation
+        context: torch.Tensor = (
+            einsum(proj_query, proj_key, "b h n c, b h m c -> b h n m") * self.scale
+        )
 
         # 3. Log continous positional bias
         log_indices = (
