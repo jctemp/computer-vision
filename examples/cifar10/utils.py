@@ -26,6 +26,8 @@ def get_cifar10_dataloaders(batch_size=128, num_workers=2):
     # Data transformations
     transform_train = transforms.Compose(
         [
+            transforms.RandomPerspective(distortion_scale=0.1, p=0.5),
+            transforms.RandomRotation(15),
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),

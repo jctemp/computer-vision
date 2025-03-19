@@ -51,10 +51,6 @@ class ViT(nn.Module):
 
         self.steps = nn.ModuleList()
         for i in range(len(depths)):
-            print(f"mut_embedding_dim={mut_embedding_dim}")
-            print(f"projection_dim={projection_dim}")
-            print(f"mlp_ratio={mlp_ratio}")
-
             for _ in range(depths[i]):
                 # Create block
                 block = SwinBlock3D(

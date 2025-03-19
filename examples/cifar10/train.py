@@ -24,33 +24,33 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Train Swin Transformer on CIFAR-10")
     parser.add_argument(
-        "--batch-size", type=int, default=128, help="Batch size for training"
+        "--batch-size", type=int, default=512, help="Batch size for training"
     )
     parser.add_argument(
-        "--epochs", type=int, default=30, help="Number of epochs to train"
+        "--epochs", type=int, default=100, help="Number of epochs to train"
     )
-    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=1e-4, help="Weight decay")
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--weight-decay", type=float, default=1e-3, help="Weight decay")
     parser.add_argument(
-        "--embed-dim", type=int, default=128, help="Initial embedding dimension"
+        "--embed-dim", type=int, default=32, help="Initial embedding dimension"
     )
     parser.add_argument(
         "--depths",
         type=List[int],
-        default=[2, 2, 2],
+        default=[2, 4, 8, 2],
         help="Number of transformer blocks",
     )
     parser.add_argument(
         "--num-heads",
         type=List[int],
-        default=[8, 8, 8],
+        default=[2, 4, 8, 16],
         help="Number of attention heads",
     )
-    parser.add_argument("--patch-size", type=int, default=4, help="Patch size")
+    parser.add_argument("--patch-size", type=int, default=2, help="Patch size")
     parser.add_argument(
         "--reduction-size", type=int, default=2, help="Reduction size for downsampling"
     )
-    parser.add_argument("--dropout", type=float, default=0.05, help="Dropout rate")
+    parser.add_argument("--dropout", type=float, default=0.01, help="Dropout rate")
     parser.add_argument(
         "--output-dir", type=str, default="./output", help="Directory to save outputs"
     )
@@ -88,6 +88,11 @@ def main():
         mlp_ratio=4,
         dropout=args.dropout,
     ).to(device)
+
+    model = torch.compile(
+        model,
+        backend="eager",
+    )
 
     # Print model summary (parameter count)
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
