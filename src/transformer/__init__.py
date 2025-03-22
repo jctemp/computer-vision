@@ -1,3 +1,5 @@
-from .block import SwinBlock3D
+from .block import WindowAttentionBlock
 
-__all__ = ["SwinBlock3D"]
+__all__ = [
+    "WindowAttentionBlock"
+]

@@ -24,20 +24,20 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Train Swin Transformer on CIFAR-10")
     parser.add_argument(
-        "--batch-size", type=int, default=512, help="Batch size for training"
+        "--batch-size", type=int, default=128, help="Batch size for training"
     )
     parser.add_argument(
-        "--epochs", type=int, default=100, help="Number of epochs to train"
+        "--epochs", type=int, default=30, help="Number of epochs to train"
     )
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=1e-3, help="Weight decay")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument("--weight-decay", type=float, default=0.05, help="Weight decay")
     parser.add_argument(
         "--embed-dim", type=int, default=32, help="Initial embedding dimension"
     )
     parser.add_argument(
         "--depths",
         type=List[int],
-        default=[2, 4, 8, 2],
+        default=[2, 4, 4, 2],
         help="Number of transformer blocks",
     )
     parser.add_argument(
@@ -46,9 +46,17 @@ def main():
         default=[2, 4, 8, 16],
         help="Number of attention heads",
     )
-    parser.add_argument("--patch-size", type=int, default=2, help="Patch size")
     parser.add_argument(
-        "--reduction-size", type=int, default=2, help="Reduction size for downsampling"
+        "--patch-size",
+        type=List[int],
+        default=[4, 4, 4, 2],
+        help="Patch size",
+    )
+    parser.add_argument(
+        "--reduction-size",
+        type=List[int],
+        default=[2, 2, 2, 2],
+        help="Reduction size for downsampling",
     )
     parser.add_argument("--dropout", type=float, default=0.01, help="Dropout rate")
     parser.add_argument(
@@ -104,9 +112,6 @@ def main():
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
 
-    # Learning rate scheduler (cosine annealing)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
-
     # Training loop
     train_losses = []
     train_accs = []
@@ -132,9 +137,6 @@ def main():
         print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%")
         print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%")
 
-        # Update learning rate
-        scheduler.step()
-
         # Save model checkpoint
         if (epoch + 1) % 5 == 0 or epoch == args.epochs - 1:
             torch.save(
@@ -142,7 +144,6 @@ def main():
                     "epoch": epoch + 1,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "scheduler_state_dict": scheduler.state_dict(),
                     "train_loss": train_loss,
                     "test_loss": test_loss,
                     "train_acc": train_acc,

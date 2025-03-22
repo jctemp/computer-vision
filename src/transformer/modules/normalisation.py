@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-
-class LayerNorm3d(nn.Module):
+class LayerNormNd(nn.Module):
     def __init__(self, in_channels: int) -> None:
         super().__init__()
         self.norm = nn.LayerNorm(in_channels)
