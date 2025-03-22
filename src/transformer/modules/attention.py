@@ -79,7 +79,9 @@ class WindowAttention(nn.Module):
         if mask is not None:
             # b h n m -> b bw h n m
             context = einops.rearrange(context, "(b bw) ... -> b bw ...", bw=bw)
-            context = context.masked_fill_(mask, -1e5)
+            context = context.masked_fill_(
+                mask, -1000.0
+            )  # No more than 1000 due to 16f support
             context = einops.rearrange(context, "b bw ... -> (b bw) ...", bw=bw)
 
         # 5. Compute coefficients
