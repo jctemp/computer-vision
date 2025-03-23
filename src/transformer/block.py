@@ -111,6 +111,21 @@ class WindowAttentionBlock(nn.Module):
 
         self.register_buffer("mask", self.shift.mask)
 
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.constant_(self.norm_attn.weight, 1.0)
+        nn.init.constant_(self.norm_attn.bias, 0)
+
+        nn.init.constant_(self.norm_mlp.weight, 0.0)
+        nn.init.constant_(self.norm_mlp.bias, 0.0)
+
+        if self.attention is not None and hasattr(self.attention, "_init_weights"):
+            self.attention._init_weights()
+
+        if self.mlp is not None and hasattr(self.mlp, "_init_weights"):
+            self.mlp._init_weights()
+
     def forward(
         self,
         query: torch.Tensor,  # b c d h w

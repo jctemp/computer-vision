@@ -43,6 +43,18 @@ class Merge2d(Merge):
         self.proj = nn.Linear(total, half, bias=True)
         self.norm = nn.LayerNorm(half)
 
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.trunc_normal_(self.proj.weight, std=0.02)
+        if hasattr(self.proj, "bias") and self.proj.bias is not None:
+            nn.init.constant_(self.proj.bias, 0)
+
+        if hasattr(self.norm, "weight") and self.norm.weight is not None:
+            nn.init.constant_(self.norm.weight, 1.0)
+        if hasattr(self.norm, "bias") and self.norm.bias is not None:
+            nn.init.constant_(self.norm.bias, 0)
+
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = einops.rearrange(
             tensor,
@@ -88,6 +100,18 @@ class Merge3d(Merge):
         self.proj = nn.Linear(total, half, bias=True)
         self.norm = nn.LayerNorm(half)
 
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.trunc_normal_(self.proj.weight, std=0.02)
+        if hasattr(self.proj, "bias") and self.proj.bias is not None:
+            nn.init.constant_(self.proj.bias, 0)
+
+        if hasattr(self.norm, "weight") and self.norm.weight is not None:
+            nn.init.constant_(self.norm.weight, 1.0)
+        if hasattr(self.norm, "bias") and self.norm.bias is not None:
+            nn.init.constant_(self.norm.bias, 0)
+
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = einops.rearrange(
             tensor,
@@ -127,7 +151,7 @@ class Merge4d(Merge):
             * kernel_size[0]
             * kernel_size[1]
             * kernel_size[2]
-            * kernel_size[4]
+            * kernel_size[3]
         )
         half = total // 2
 
@@ -139,6 +163,18 @@ class Merge4d(Merge):
 
         self.proj = nn.Linear(total, half, bias=True)
         self.norm = nn.LayerNorm(half)
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.trunc_normal_(self.proj.weight, std=0.02)
+        if hasattr(self.proj, "bias") and self.proj.bias is not None:
+            nn.init.constant_(self.proj.bias, 0)
+
+        if hasattr(self.norm, "weight") and self.norm.weight is not None:
+            nn.init.constant_(self.norm.weight, 1.0)
+        if hasattr(self.norm, "bias") and self.norm.bias is not None:
+            nn.init.constant_(self.norm.bias, 0)
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = einops.rearrange(

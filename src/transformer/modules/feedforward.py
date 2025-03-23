@@ -23,6 +23,17 @@ class FeedForwardNetwork(nn.Module):
         self.activate = act_type()
         self.contract = nn.Linear(hidden_channels, in_channels)
 
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.trunc_normal_(self.expand.weight, std=0.02)
+        if hasattr(self.expand, "bias") and self.expand.bias is not None:
+            nn.init.constant_(self.expand.bias, 0)
+
+        nn.init.trunc_normal_(self.contract.weight, std=0.02)
+        if hasattr(self.contract, "bias") and self.contract.bias is not None:
+            nn.init.constant_(self.contract.bias, 0)
+
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = self.expand(tensor)
         tensor = self.activate(tensor)

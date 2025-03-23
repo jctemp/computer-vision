@@ -19,6 +19,7 @@ class WindowAttention(nn.Module):
         drop_proj: float = 0.1,
         enable_sampling: bool = False,
         rpe: RelativePositionalEncoder = None,
+        keep_attn_weights: bool = False,
     ) -> None:
         super().__init__()
 
@@ -39,7 +40,34 @@ class WindowAttention(nn.Module):
         self.scale = 1.0 / self.projection_dim**0.5
         self.rpe = rpe
 
-        self.attention: Optional[torch.Tensor] = None
+        self.keep_attn_weights = keep_attn_weights
+        self.attn_weights: Optional[torch.Tensor] = None
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        nn.init.trunc_normal_(self.proj_q.weight, std=0.02)
+        nn.init.trunc_normal_(self.proj_k.weight, std=0.02)
+        nn.init.trunc_normal_(self.proj_v.weight, std=0.02)
+        nn.init.trunc_normal_(self.proj_w.weight, std=0.02)
+
+        if (
+            self.qkv_bias
+            and hasattr(self.proj_q, "bias")
+            and self.proj_q.bias is not None
+        ):
+            nn.init.constant_(self.proj_q.bias, 0)
+        if (
+            self.qkv_bias
+            and hasattr(self.proj_k, "bias")
+            and self.proj_k.bias is not None
+        ):
+            nn.init.constant_(self.proj_k.bias, 0)
+        if hasattr(self.proj_w, "bias") and self.proj_w.bias is not None:
+            nn.init.constant_(self.proj_w.bias, 0)
+
+        if self.rpe is not None and hasattr(self.rpe, "_init_weights"):
+            self.rpe._init_weights()
 
     def forward(
         self,
@@ -79,14 +107,16 @@ class WindowAttention(nn.Module):
         if mask is not None:
             # b h n m -> b bw h n m
             context = einops.rearrange(context, "(b bw) ... -> b bw ...", bw=bw)
-            context = context.masked_fill_(
-                mask, -1000.0
-            )  # No more than 1000 due to 16f support
+            context = context.masked_fill_(mask, float("-inf"))
             context = einops.rearrange(context, "b bw ... -> (b bw) ...", bw=bw)
 
         # 5. Compute coefficients
         attention = nnf.softmax(context, dim=-1)
-        self.attention = einops.rearrange(attention, "(b bw) ... -> b bw ...", bw=bw)
+        self.attn_weights = (
+            einops.rearrange(attention, "(b bw) ... -> b bw ...", bw=bw)
+            if self.keep_attn_weights
+            else None
+        )
         attention = nnf.dropout(
             attention,
             p=self.drop_attn,

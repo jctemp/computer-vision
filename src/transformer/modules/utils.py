@@ -215,7 +215,7 @@ def compute_relative_positions_4d(
     on, od, oh, ow = offsets
 
     idx_n = einops.repeat(
-        torch.arange(d, dtype=torch.float, device=device), "c -> c d h w", d=d, h=h, w=w
+        torch.arange(n, dtype=torch.float, device=device), "c -> c d h w", d=d, h=h, w=w
     ).flatten()
     idx_d = einops.repeat(
         torch.arange(d, dtype=torch.float, device=device), "c -> n c h w", n=n, h=h, w=w
