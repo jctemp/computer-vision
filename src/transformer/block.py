@@ -42,8 +42,8 @@ class WindowAttentionBlock(nn.Module):
         self,
         volume_size: InputNd,
         kernel_size: InputNd,
-        embedding_dim: int,
-        projection_dim: int = 256,
+        in_channels: int,
+        embedding_dim: int = 256,
         heads: int = 8,
         qkv_bias: bool = True,
         drop_attn: float = 0.1,
@@ -70,8 +70,8 @@ class WindowAttentionBlock(nn.Module):
                 "Cannot infer dimension. Please pass a tuple or list to compute current Nd."
             )
 
-        self.in_channels = embedding_dim
-        self.out_channels = embedding_dim
+        self.in_channels = in_channels
+        self.out_channels = in_channels
 
         self.volume_size = make_tuple[dim](volume_size)
         self.kernel_size = make_tuple[dim](kernel_size)
@@ -84,8 +84,8 @@ class WindowAttentionBlock(nn.Module):
         self.shift = Shift[dim](self.kernel_size, self.volume_size)
 
         self.attention = WindowAttention(
+            in_channels=in_channels,
             embedding_dim=embedding_dim,
-            projection_dim=projection_dim,
             heads=heads,
             qkv_bias=qkv_bias,
             drop_attn=drop_attn,
@@ -97,16 +97,16 @@ class WindowAttentionBlock(nn.Module):
                 self.max_distance,
             ),
         )
-        self.norm_attn = nn.LayerNorm(embedding_dim)
+        self.norm_attn = nn.LayerNorm(in_channels)
 
         self.mlp = FeedForwardNetwork(
-            in_channels=embedding_dim,
-            hidden_channels=embedding_dim * mlp_ratio,
+            in_channels=in_channels,
+            hidden_channels=in_channels * mlp_ratio,
             drop_proj=drop_proj,
             enable_sampling=enable_sampling,
             act_type=act_type,
         )
-        self.norm_mlp = nn.LayerNorm(embedding_dim)
+        self.norm_mlp = nn.LayerNorm(in_channels)
         self.drop_path = DropPath(p=drop_path, enable_sampling=enable_sampling)
 
         self.register_buffer("mask", self.shift.mask)

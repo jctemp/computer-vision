@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as nnf
@@ -24,6 +25,7 @@ class Merge2d(Merge):
         self,
         in_channels: int,
         kernel_size: Input2d,
+        out_channels: Optional[int] = None,
         drop_proj: float = 0.05,
         enable_sampling: bool = False,
     ) -> None:
@@ -32,16 +34,16 @@ class Merge2d(Merge):
         kernel_size = make_tuple_2d(kernel_size)
 
         total = in_channels * kernel_size[0] * kernel_size[1]
-        half = total // 2
+        out_channels = total // 2 if out_channels is None else out_channels
 
         self.in_channels = in_channels
-        self.out_channels = half
+        self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.drop_proj = drop_proj
         self.enable_sampling = enable_sampling
 
-        self.proj = nn.Linear(total, half, bias=True)
-        self.norm = nn.LayerNorm(half)
+        self.proj = nn.Linear(total, out_channels, bias=True)
+        self.norm = nn.LayerNorm(out_channels)
 
         self._init_weights()
 
@@ -81,6 +83,7 @@ class Merge3d(Merge):
         self,
         in_channels: int,
         kernel_size: Input3d,
+        out_channels: Optional[int] = None,
         drop_proj: float = 0.05,
         enable_sampling: bool = False,
     ) -> None:
@@ -89,16 +92,16 @@ class Merge3d(Merge):
         kernel_size = make_tuple_3d(kernel_size)
 
         total = in_channels * kernel_size[0] * kernel_size[1] * kernel_size[2]
-        half = total // 2
+        out_channels = total // 2 if out_channels is None else out_channels
 
         self.in_channels = in_channels
-        self.out_channels = half
+        self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.drop_proj = drop_proj
         self.enable_sampling = enable_sampling
 
-        self.proj = nn.Linear(total, half, bias=True)
-        self.norm = nn.LayerNorm(half)
+        self.proj = nn.Linear(total, out_channels, bias=True)
+        self.norm = nn.LayerNorm(out_channels)
 
         self._init_weights()
 
@@ -139,6 +142,7 @@ class Merge4d(Merge):
         self,
         in_channels: int,
         kernel_size: Input4d,
+        out_channels: Optional[int] = None,
         drop_proj: float = 0.05,
         enable_sampling: bool = False,
     ) -> None:
@@ -153,16 +157,16 @@ class Merge4d(Merge):
             * kernel_size[2]
             * kernel_size[3]
         )
-        half = total // 2
+        out_channels = total // 2 if out_channels is None else out_channels
 
         self.in_channels = in_channels
-        self.out_channels = half
+        self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.drop_proj = drop_proj
         self.enable_sampling = enable_sampling
 
-        self.proj = nn.Linear(total, half, bias=True)
-        self.norm = nn.LayerNorm(half)
+        self.proj = nn.Linear(total, out_channels, bias=True)
+        self.norm = nn.LayerNorm(out_channels)
 
         self._init_weights()
 

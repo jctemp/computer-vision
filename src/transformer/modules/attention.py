@@ -8,11 +8,12 @@ import einops
 from .positionalencoding import RelativePositionalEncoder
 
 
+@torch.compile
 class WindowAttention(nn.Module):
     def __init__(
         self,
-        embedding_dim: int,
-        projection_dim: int = 256,
+        in_channels: int,
+        embedding_dim: int = 256,
         heads: int = 8,
         qkv_bias: bool = True,
         drop_attn: float = 0.1,
@@ -23,8 +24,8 @@ class WindowAttention(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.embedding_dim = embedding_dim
-        self.projection_dim = projection_dim // heads
+        self.in_channels = in_channels
+        self.embedding_dim = embedding_dim // heads
         self.heads = heads
         self.qkv_bias = qkv_bias
 
@@ -32,12 +33,12 @@ class WindowAttention(nn.Module):
         self.drop_proj = drop_proj
         self.enable_sampling = enable_sampling
 
-        self.proj_q = nn.Linear(embedding_dim, self.projection_dim * heads, qkv_bias)
-        self.proj_k = nn.Linear(embedding_dim, self.projection_dim * heads, qkv_bias)
-        self.proj_v = nn.Linear(embedding_dim, self.projection_dim * heads, False)
-        self.proj_w = nn.Linear(self.projection_dim * heads, embedding_dim)
+        self.proj_q = nn.Linear(in_channels, self.embedding_dim * heads, qkv_bias)
+        self.proj_k = nn.Linear(in_channels, self.embedding_dim * heads, qkv_bias)
+        self.proj_v = nn.Linear(in_channels, self.embedding_dim * heads, False)
+        self.proj_w = nn.Linear(self.embedding_dim * heads, in_channels)
 
-        self.scale = 1.0 / self.projection_dim**0.5
+        self.scale = 1.0 / self.embedding_dim**0.5
         self.rpe = rpe
 
         self.keep_attn_weights = keep_attn_weights
