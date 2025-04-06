@@ -5,7 +5,7 @@ from transformer import WindowAttentionBlock
 from transformer.modules import Merge2d, ContinuousEncoder
 
 
-class ViT(nn.Module):
+class ShiftingWindowTransformer(nn.Module):
     def __init__(
         self,
         img_size=32,
@@ -52,8 +52,8 @@ class ViT(nn.Module):
                 block = WindowAttentionBlock(
                     volume_size=mut_volume_size,
                     kernel_size=kernel_size[i],
-                    embedding_dim=mut_embedding_dim,
-                    projection_dim=projection_dim,
+                    in_channels=mut_embedding_dim,
+                    embedding_dim=projection_dim,
                     heads=heads[i],
                     mlp_ratio=mlp_ratio,
                     drop_proj=drop_proj,
