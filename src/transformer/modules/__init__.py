@@ -1,32 +1,40 @@
+from .attention import WindowedAttention
+from .block import WindowedAttentionBlockNd
+from .layers import FeedForwardNetwork, LayerNormNd, DownsampleNd
 from .positionalencoding import (
     RelativePositionalEncoder,
     BiasEncoder,
     ContinuousEncoder,
 )
-from .attention import WindowAttention
-from .batch import Batch2d, Batch3d, Batch4d
-from .droppath import DropPath
-from .feedforward import FeedForwardNetwork
-from .merge import Merge2d, Merge3d, Merge4d
-from .normalisation import LayerNormNd
-from .shift import Shift2d, Shift3d, Shift4d
-
+from .utils import (
+    make_tuple_nd,
+    batch_nd,
+    unbatch_nd,
+    shift_nd,
+    unshift_nd,
+    generate_shift_nd_mask,
+    generate_absolute_coordinates_nd,
+    generate_relative_attention_coordinates_nd,
+)
 
 __all__ = [
-    "WindowAttention",
-    "RelativePositionalEncoder",
+    "WindowedAttention",
+    "WindowedAttentionBlockNd",
+    # LAYERS
+    "DownsampleNd",
+    "FeedForwardNetwork",
+    "LayerNormNd",
+    # ENCODING
     "BiasEncoder",
     "ContinuousEncoder",
-    "Batch2d",
-    "Batch3d",
-    "Batch4d",
-    "DropPath",
-    "FeedForwardNetwork",
-    "Merge2d",
-    "Merge3d",
-    "Merge4d",
-    "LayerNormNd",
-    "Shift2d",
-    "Shift3d",
-    "Shift4d",
+    "RelativePositionalEncoder",
+    # UTILS
+    "batch_nd",
+    "generate_absolute_coordinates_nd",
+    "generate_relative_attention_coordinates_nd",
+    "generate_shift_nd_mask",
+    "make_tuple_nd",
+    "shift_nd",
+    "unbatch_nd",
+    "unshift_nd",
 ]

@@ -1,50 +1,36 @@
-from typing import Optional
+from typing import Optional, Sequence, Union
 import functools
 
 import torch
 import torch.nn as nn
 import einops
 
-
-from ..modules.utils import (
-    InputNd,
-    compute_relative_positions_2d,
-    compute_relative_positions_3d,
-    compute_relative_positions_4d,
-)
+from .utils import make_tuple_nd, generate_relative_attention_coordinates_nd
 
 
 class RelativePositionalEncoder(nn.Module):
     def __init__(
-        self, kernel_size: InputNd, heads: int, max_distance: Optional[InputNd] = None
+        self,
+        ndim: int,
+        kernel_size: Union[int, Sequence[int]],
+        heads: int,
+        max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
         super().__init__()
 
-        self.kernel_size = kernel_size
+        self.ndim = ndim
+        self.kernel_size = make_tuple_nd(kernel_size)
         self.heads = heads
         self.max_distance = (
             [k - 1 for k in kernel_size]
             if max_distance is None
-            else [min(d, k) for d, k in zip(max_distance, kernel_size)]
+            else [min(d, k) for d, k in zip(make_tuple_nd(max_distance), kernel_size)]
         )
 
     def get_indices(self) -> torch.Tensor:
-        indices = None
-        if len(self.kernel_size) == 2:
-            indices = compute_relative_positions_2d(
-                self.kernel_size, self.max_distance, False
-            )
-        elif len(self.kernel_size) == 3:
-            indices = compute_relative_positions_3d(
-                self.kernel_size, self.max_distance, False
-            )
-        elif len(self.kernel_size) == 4:
-            indices = compute_relative_positions_4d(
-                self.kernel_size, self.max_distance, False
-            )
-        else:
-            raise ValueError("kernel_size is not of dim: 2, 3, 4")
-        return indices
+        return generate_relative_attention_coordinates_nd(
+            self.ndim, self.kernel_size, self.max_distance, normalise=False
+        )
 
     def get_embeddings(self, _: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("get_embeddings() is not implemented")
@@ -59,7 +45,10 @@ class RelativePositionalEncoder(nn.Module):
 
 class BiasEncoder(RelativePositionalEncoder):
     def __init__(
-        self, kernel_size: InputNd, heads: int, max_distance: Optional[InputNd] = None
+        self,
+        kernel_size: Union[int, Sequence[int]],
+        heads: int,
+        max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
         super().__init__(kernel_size, heads, max_distance)
 
@@ -79,7 +68,10 @@ class BiasEncoder(RelativePositionalEncoder):
 
 class ContinuousEncoder(RelativePositionalEncoder):
     def __init__(
-        self, kernel_size: InputNd, heads: int, max_distance: Optional[InputNd] = None
+        self,
+        kernel_size: Union[int, Sequence[int]],
+        heads: int,
+        max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
         super().__init__(kernel_size, heads, max_distance)
 

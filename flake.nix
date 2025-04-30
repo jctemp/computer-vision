@@ -17,10 +17,33 @@
     in {
       default = let
         python = pkgs.python312;
-        cuda = pkgs.cudaPackages.cudatoolkit;
-        cudnn = pkgs.cudaPackages.cudnn;
+        cuda = pkgs.symlinkJoin {
+          name = "cuda-merged";
+          paths = with pkgs; [
+            cudaPackages.cudnn
+
+            cudaPackages.cuda_cccl
+            cudaPackages.cuda_cudart
+            cudaPackages.cuda_cupti
+            cudaPackages.cuda_cuxxfilt
+            cudaPackages.cuda_gdb
+            cudaPackages.cuda_nvcc
+            cudaPackages.cuda_nvdisasm
+            cudaPackages.cuda_nvml_dev
+            cudaPackages.cuda_nvprune
+            cudaPackages.cuda_nvrtc
+            cudaPackages.cuda_nvtx
+
+            cudaPackages.libcublas
+            cudaPackages.libcufft
+            cudaPackages.libcurand
+            cudaPackages.libcusolver
+            cudaPackages.libcusparse
+            cudaPackages.libnpp
+          ];
+        };
       in
-        (pkgs.buildFHSUserEnv {
+        (pkgs.buildFHSEnv {
           name = "ml-fhs";
           targetPkgs = pkgs: (with pkgs; [
             # Basic tools
@@ -40,15 +63,17 @@
             glib
             libGL
             stdenv.cc.cc.lib
+            zlib
 
             # Python and basic packages
             python
             python.pkgs.uv
             python.pkgs.pip
 
-            # CUDA packages
+            firefox
+            geckodriver
+
             cuda
-            cudnn
           ]);
 
           profile = ''
@@ -56,16 +81,14 @@
             export CC=${pkgs.gcc}/bin/gcc
             export CXX=${pkgs.gcc}/bin/g++
             export CUDA_HOME=${cuda}
-            export CUDNN_HOME=${cudnn}
-            export CUDACXX=${cuda.cc}/bin/nvcc
 
             export LD_LIBRARY_PATH=/lib:/lib64:/usr/lib:/usr/lib64
-            export LD_LIBRARY_PATH=${cuda}/lib:${cudnn}/lib:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=${cuda}/lib:$LD_LIBRARY_PATH
 
             export PATH=$PATH:${cuda}/bin
 
-            export UV_SYSTEM_PYTHON=${python}/bin/python
-            export UV_PYTHONPATH=${python}/lib/python3.12/site-packages
+            # export UV_SYSTEM_PYTHON=${python}/bin/python
+            # export UV_PYTHONPATH=${python}/lib/python3.12/site-packages
             export PYTHONPATH=$PYTHONPATH:${python}/lib/python3.12/site-packages
 
             # Display environment info
@@ -83,7 +106,6 @@
             echo "  uv pip install -r req.txt   - Install dependencies"
             echo "  uv pip install -e .         - Install package in dev mode"
             echo "  uv-init [project-name]      - Initialize ML project"
-            echo "  cuda-test                   - Test CUDA availability"
           '';
 
           runScript = "bash";

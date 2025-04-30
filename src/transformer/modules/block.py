@@ -1,48 +1,32 @@
-from typing import Optional, Type
+from typing import Optional, Sequence, Type, Union
 
 import torch
 import torch.nn as nn
+import torchvision.ops as tvo
 
-from .modules import (
-    Shift2d,
-    Shift3d,
-    Shift4d,
-    Batch2d,
-    Batch3d,
-    Batch4d,
-    WindowAttention,
+from .utils import (
+    make_tuple_nd,
+    shift_nd,
+    unshift_nd,
+    batch_nd,
+    unbatch_nd,
+    generate_shift_nd_mask,
+)
+from .attention import WindowedAttention
+from .feedforward import FeedForwardNetwork
+from .positionalencoding import (
     RelativePositionalEncoder,
     BiasEncoder,
-    FeedForwardNetwork,
-    DropPath,
 )
-from .modules.utils import InputNd, make_tuple_2d, make_tuple_3d, make_tuple_4d
-
-make_tuple = {
-    2: make_tuple_2d,
-    3: make_tuple_3d,
-    4: make_tuple_4d,
-}
-
-Shift = {
-    2: Shift2d,
-    3: Shift3d,
-    4: Shift4d,
-}
-
-Batch = {
-    2: Batch2d,
-    3: Batch3d,
-    4: Batch4d,
-}
 
 
-class WindowAttentionBlock(nn.Module):
+class WindowedAttentionBlockNd(nn.Module):
     def __init__(
         self,
-        volume_size: InputNd,
-        kernel_size: InputNd,
+        ndim: int,
         in_channels: int,
+        dimensions: Union[int, Sequence[int]],
+        kernel_size: Union[int, Sequence[int]],
         embedding_dim: int = 256,
         heads: int = 8,
         qkv_bias: bool = True,
@@ -54,36 +38,27 @@ class WindowAttentionBlock(nn.Module):
         enable_sampling: bool = False,
         act_type: Type[nn.Module] = nn.GELU,
         rpe_type: Type[RelativePositionalEncoder] = BiasEncoder,
-        max_distance: Optional[InputNd] = None,
+        max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
         super().__init__()
 
-        dim = -1
-        if isinstance(volume_size, tuple) or isinstance(volume_size, list):
-            dim = len(volume_size)
-        elif isinstance(kernel_size, tuple) or isinstance(kernel_size, list):
-            dim = len(kernel_size)
-        elif isinstance(max_distance, tuple) or isinstance(max_distance, list):
-            dim = len(max_distance)
-        else:
-            raise ValueError(
-                "Cannot infer dimension. Please pass a tuple or list to compute current Nd."
-            )
+        if ndim <= 0:
+            raise ValueError("ndim must be positive.")
+
+        self.ndim = ndim
 
         self.in_channels = in_channels
         self.out_channels = in_channels
 
-        self.volume_size = make_tuple[dim](volume_size)
-        self.kernel_size = make_tuple[dim](kernel_size)
-        self.max_distance = make_tuple[dim](max_distance)
+        self.dimensions = make_tuple_nd(dimensions, ndim)
+        self.kernel_size = make_tuple_nd(kernel_size, ndim)
+        self.max_distance = make_tuple_nd(max_distance, ndim)
 
         self.shifted = shifted
+        self.shift_size = [k // 2 for k in self.kernel_size]
         self.enable_sampling = enable_sampling
 
-        self.partition = Batch[dim](self.kernel_size, self.volume_size)
-        self.shift = Shift[dim](self.kernel_size, self.volume_size)
-
-        self.attention = WindowAttention(
+        self.attention = WindowedAttention(
             in_channels=in_channels,
             embedding_dim=embedding_dim,
             heads=heads,
@@ -107,9 +82,14 @@ class WindowAttentionBlock(nn.Module):
             act_type=act_type,
         )
         self.norm_mlp = nn.LayerNorm(in_channels)
-        self.drop_path = DropPath(p=drop_path, enable_sampling=enable_sampling)
+        self.drop_path = tvo.StochasticDepth(p=drop_path)
 
-        self.register_buffer("mask", self.shift.mask)
+        self.register_buffer(
+            "mask",
+            generate_shift_nd_mask(
+                ndim, kernel_size, dimensions, shift_size=self.shift_size
+            ),
+        )
 
         self._init_weights()
 
@@ -139,18 +119,18 @@ class WindowAttentionBlock(nn.Module):
         else:
             raise ValueError(
                 "You have to set query(q), key(k) and value(v) "
-                "or only q resulting in q, k, v to be equi."
+                "or only q resulting in q, k, v to be equal."
             )
 
         # Volume to partition sequence
         if self.shifted:
-            query = self.shift(query)
-            key = self.shift(key)
-            value = self.shift(value)
+            query = shift_nd(query, self.ndim, self.shift_size)
+            key = shift_nd(key, self.ndim, self.shift_size)
+            value = shift_nd(value, self.ndim, self.shift_size)
 
-        query = self.partition(query)
-        key = self.partition(key)
-        value = self.partition(value)
+        query = batch_nd(query, self.ndim, self.kernel_size)
+        key = batch_nd(key, self.ndim, self.kernel_size)
+        value = batch_nd(value, self.ndim, self.kernel_size)
 
         masked = self.mask
         if mask is not None:
@@ -174,8 +154,8 @@ class WindowAttentionBlock(nn.Module):
         out = self.drop_path(out) + residual
 
         # Sequence to volume
-        out = self.partition(out, reversed=True)
+        out = unbatch_nd(out, self.ndim, self.kernel_size, self.dimensions)
         if self.shifted:
-            out = self.shift(out, reversed=True)
+            out = unshift_nd(out, self.ndim, self.shift_size)
 
         return out
