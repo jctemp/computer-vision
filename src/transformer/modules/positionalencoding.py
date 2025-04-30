@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import einops
 
-from .utils import make_tuple_nd, generate_relative_attention_coordinates_nd
+from .utils import make_tuple_nd, generate_relative_coordinate_indices_nd
 
 
 class RelativePositionalEncoder(nn.Module):
@@ -28,7 +28,7 @@ class RelativePositionalEncoder(nn.Module):
         )
 
     def get_indices(self) -> torch.Tensor:
-        return generate_relative_attention_coordinates_nd(
+        return generate_relative_coordinate_indices_nd(
             self.ndim, self.kernel_size, self.max_distance, normalise=False
         )
 

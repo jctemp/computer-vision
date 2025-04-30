@@ -13,7 +13,7 @@ from .utils import (
     generate_shift_nd_mask,
 )
 from .attention import WindowedAttention
-from .feedforward import FeedForwardNetwork
+from .layers import FeedForwardNetwork
 from .positionalencoding import (
     RelativePositionalEncoder,
     BiasEncoder,
