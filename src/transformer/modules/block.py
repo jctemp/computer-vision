@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Type, Union
+from typing import Optional, Sequence, Type, Union, Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -25,7 +25,6 @@ class WindowedAttentionBlockNd(nn.Module):
         self,
         ndim: int,
         in_channels: int,
-        dimensions: Union[int, Sequence[int]],
         kernel_size: Union[int, Sequence[int]],
         embedding_dim: int = 256,
         heads: int = 8,
@@ -50,9 +49,10 @@ class WindowedAttentionBlockNd(nn.Module):
         self.in_channels = in_channels
         self.out_channels = in_channels
 
-        self.dimensions = make_tuple_nd(dimensions, ndim)
         self.kernel_size = make_tuple_nd(kernel_size, ndim)
-        self.max_distance = make_tuple_nd(max_distance, ndim)
+        self.max_distance = (
+            make_tuple_nd(max_distance, ndim) if max_distance is not None else None
+        )
 
         self.shifted = shifted
         self.shift_size = [k // 2 for k in self.kernel_size]
@@ -67,6 +67,7 @@ class WindowedAttentionBlockNd(nn.Module):
             drop_proj=drop_proj,
             enable_sampling=enable_sampling,
             rpe=rpe_type(
+                ndim,
                 self.kernel_size,
                 heads,
                 self.max_distance,
@@ -82,14 +83,9 @@ class WindowedAttentionBlockNd(nn.Module):
             act_type=act_type,
         )
         self.norm_mlp = nn.LayerNorm(in_channels)
-        self.drop_path = tvo.StochasticDepth(p=drop_path)
+        self.drop_path = tvo.StochasticDepth(p=drop_path, mode="row")
 
-        self.register_buffer(
-            "mask",
-            generate_shift_nd_mask(
-                ndim, kernel_size, dimensions, shift_size=self.shift_size
-            ),
-        )
+        self.mask: Dict[Tuple[int, ...], torch.BoolTensor] = {}
 
         self._init_weights()
 
@@ -97,7 +93,7 @@ class WindowedAttentionBlockNd(nn.Module):
         nn.init.constant_(self.norm_attn.weight, 1.0)
         nn.init.constant_(self.norm_attn.bias, 0)
 
-        nn.init.constant_(self.norm_mlp.weight, 0.0)
+        nn.init.constant_(self.norm_mlp.weight, 1.0)
         nn.init.constant_(self.norm_mlp.bias, 0.0)
 
         if self.attention is not None and hasattr(self.attention, "_init_weights"):
@@ -111,8 +107,13 @@ class WindowedAttentionBlockNd(nn.Module):
         query: torch.Tensor,  # b c d h w
         key: Optional[torch.Tensor] = None,  # b c d h w
         value: Optional[torch.Tensor] = None,  # b c d h w
-        mask: Optional[torch.BoolTensor] = None,  # b c d h w
+        mask: Optional[torch.BoolTensor] = None,  # b d h w
     ) -> torch.Tensor:
+        input_spatial_dims = tuple(query.size()[2:])
+
+        external_mask: Optional[torch.BoolTensor] = None
+        cached_shift_mask: Optional[torch.BoolTensor] = None
+
         if key is None and value is None:
             key = query
             value = query
@@ -122,27 +123,76 @@ class WindowedAttentionBlockNd(nn.Module):
                 "or only q resulting in q, k, v to be equal."
             )
 
+        if mask is not None:
+            external_mask = mask.unsqueeze(1).to(query.device)
+
+            # 1. Shift the mask if the input is shifted
+            if self.shifted:
+                external_mask = shift_nd(external_mask, self.ndim, self.shift_size)
+
+            # 2. Build patches as the windows are masked individuallys
+            batched_external_mask, _ = batch_nd(
+                external_mask, self.ndim, self.kernel_size
+            )
+
+            # 3. Compute mask for query and keys
+            patch_product_len = batched_external_mask.size(2)
+            batched_external_mask = batched_external_mask.squeeze(-1)
+            # (B, num_windows, patch_prod_len, 1)
+            mask_q_expanded = batched_external_mask.unsqueeze(-1).expand(
+                -1, -1, -1, patch_product_len
+            )
+            # (B, num_windows, 1, patch_prod_len)
+            mask_k_expanded = batched_external_mask.unsqueeze(-2).expand(
+                -1, -1, patch_product_len, -1
+            )
+
+            # 4. If either has been mask, we cannot use it in attention computation
+            # (B, num_windows, patch_prod_len, patch_prod_len)
+            external_mask = mask_q_expanded | mask_k_expanded
+
+            # 5. Have a broadcastable shape
+            # (B, num_windows, 1, patch_prod_len, patch_prod_len)
+            external_mask = external_mask.unsqueeze(2)
+
         # Volume to partition sequence
         if self.shifted:
+            cached_shift_mask = self.mask.get(input_spatial_dims)
+            if cached_shift_mask is None:
+                cached_shift_mask = generate_shift_nd_mask(
+                    self.ndim,
+                    self.kernel_size,
+                    input_spatial_dims,
+                    shift_size=self.shift_size,
+                )
+                self.mask[input_spatial_dims] = cached_shift_mask
+
             query = shift_nd(query, self.ndim, self.shift_size)
             key = shift_nd(key, self.ndim, self.shift_size)
             value = shift_nd(value, self.ndim, self.shift_size)
 
-        query = batch_nd(query, self.ndim, self.kernel_size)
-        key = batch_nd(key, self.ndim, self.kernel_size)
-        value = batch_nd(value, self.ndim, self.kernel_size)
+        query_batched, batched_spatial_dims = batch_nd(
+            query, self.ndim, self.kernel_size
+        )
+        key_batched, _ = batch_nd(key, self.ndim, self.kernel_size)
+        value_batched, _ = batch_nd(value, self.ndim, self.kernel_size)
 
-        masked = self.mask
-        if mask is not None:
-            masked += self.partition(mask)
+        attention_mask = None
+        if external_mask is not None:
+            attention_mask = external_mask
+        if cached_shift_mask is not None:
+            if attention_mask is not None:
+                attention_mask = attention_mask | cached_shift_mask
+            else:
+                attention_mask = cached_shift_mask
 
         # Attention computation
-        residual = query
+        residual = query_batched
         attention = self.attention(
-            query=query,
-            key=key,
-            value=value,
-            mask=masked,
+            query=query_batched,
+            key=key_batched,
+            value=value_batched,
+            mask=attention_mask,
         )
         attention = self.norm_attn(attention)
         attention = self.drop_path(attention) + residual
@@ -154,7 +204,7 @@ class WindowedAttentionBlockNd(nn.Module):
         out = self.drop_path(out) + residual
 
         # Sequence to volume
-        out = unbatch_nd(out, self.ndim, self.kernel_size, self.dimensions)
+        out = unbatch_nd(out, self.ndim, self.kernel_size, batched_spatial_dims)
         if self.shifted:
             out = unshift_nd(out, self.ndim, self.shift_size)
 

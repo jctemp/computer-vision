@@ -19,17 +19,20 @@ class RelativePositionalEncoder(nn.Module):
         super().__init__()
 
         self.ndim = ndim
-        self.kernel_size = make_tuple_nd(kernel_size)
+        self.kernel_size = make_tuple_nd(kernel_size, ndim)
         self.heads = heads
         self.max_distance = (
             [k - 1 for k in kernel_size]
             if max_distance is None
-            else [min(d, k) for d, k in zip(make_tuple_nd(max_distance), kernel_size)]
+            else [
+                min(d, k)
+                for d, k in zip(make_tuple_nd(max_distance, ndim), kernel_size)
+            ]
         )
 
-    def get_indices(self) -> torch.Tensor:
+    def get_indices(self, normalise=False) -> torch.Tensor:
         return generate_relative_coordinate_indices_nd(
-            self.ndim, self.kernel_size, self.max_distance, normalise=False
+            self.ndim, self.kernel_size, self.max_distance, normalise=normalise
         )
 
     def get_embeddings(self, _: torch.Tensor) -> torch.Tensor:
@@ -39,18 +42,20 @@ class RelativePositionalEncoder(nn.Module):
         return tensor
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
-        tensor += einops.rearrange(self.get_embeddings(tensor), "l s h -> () h l s")
+        embeddings = self.get_embeddings(tensor)
+        tensor += einops.rearrange(embeddings, "l s h -> () h l s")
         return self._post_embedding(tensor)
 
 
 class BiasEncoder(RelativePositionalEncoder):
     def __init__(
         self,
+        ndim: int,
         kernel_size: Union[int, Sequence[int]],
         heads: int,
         max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
-        super().__init__(kernel_size, heads, max_distance)
+        super().__init__(ndim, kernel_size, heads, max_distance)
 
         self.positional_bias = nn.Embedding(
             sum(2 * d + 1 for d in self.max_distance), self.heads
@@ -60,7 +65,7 @@ class BiasEncoder(RelativePositionalEncoder):
         self._init_weights()
 
     def get_embeddings(self, _: torch.Tensor) -> torch.Tensor:
-        return self.positional_bias(self.indices.type(torch.int64)).sum(-2)
+        return self.positional_bias(self.indices.type(torch.int64)).sum(0)
 
     def _init_weights(self) -> None:
         nn.init.trunc_normal_(self.positional_bias.weight, std=0.02)
@@ -69,11 +74,12 @@ class BiasEncoder(RelativePositionalEncoder):
 class ContinuousEncoder(RelativePositionalEncoder):
     def __init__(
         self,
+        ndim: int,
         kernel_size: Union[int, Sequence[int]],
         heads: int,
         max_distance: Optional[Union[int, Sequence[int]]] = None,
     ) -> None:
-        super().__init__(kernel_size, heads, max_distance)
+        super().__init__(ndim, kernel_size, heads, max_distance)
 
         hidden_dim = functools.reduce(lambda x, y: x * y, self.kernel_size)
         self.cpb_mlp = nn.Sequential(
@@ -82,7 +88,7 @@ class ContinuousEncoder(RelativePositionalEncoder):
             nn.Linear(hidden_dim, self.heads),
         )
 
-        indices = self.get_indices()
+        indices = self.get_indices(normalise=True)
         log_indices = (
             # use log_8
             torch.sign(indices)

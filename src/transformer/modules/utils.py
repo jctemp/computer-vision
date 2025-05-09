@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Tuple
+from typing import Optional, Union, Sequence, Tuple
 import torch
 import einops
 import itertools
@@ -202,7 +202,7 @@ def generate_shift_nd_mask(
     dimensions: Union[int, Sequence[int]],
     shift_size: Union[int, Sequence[int]],
     device=None,
-) -> torch.Tensor:
+) -> torch.BoolTensor:
     """
     Generates a batched shift mask for an ND-shape. Non-overlapping regions
     after a shift should not receive attention, hence a mask.
@@ -288,8 +288,8 @@ def generate_absolute_coordinates_nd(
 def generate_relative_coordinate_indices_nd(
     ndim: int,
     dimensions: Union[int, Sequence[int]],
-    max_distances: Union[int, Sequence[int]] = None,
-    normalise: bool = True,
+    max_distances: Optional[Union[int, Sequence[int]]] = None,
+    normalise: bool = False,
     device=None,
 ) -> torch.Tensor:
     """
@@ -301,10 +301,18 @@ def generate_relative_coordinate_indices_nd(
         raise ValueError("ndim must be positive.")
 
     dimensions = make_tuple_nd(dimensions, ndim)
-    max_distances = (
-        make_tuple_nd(max_distances, ndim) if max_distances is not None else dimensions
+    if max_distances is None:
+        max_distances_calc = tuple(d - 1 for d in dimensions)
+    else:
+        # Ensure max_distances is a tuple and potentially clip based on dimensions
+        max_distances_input = make_tuple_nd(max_distances, ndim)
+        max_distances_calc = tuple(
+            min(md, d - 1) for md, d in zip(max_distances_input, dimensions)
+        )
+
+    offsets = [0] + list(
+        itertools.accumulate((2 * d + 1 for d in max_distances_calc[:-1]))
     )
-    offsets = [0] + list(itertools.accumulate((2 * d + 1 for d in max_distances[:-1])))
 
     spatial_dim = [f"d{i}" for i in range(ndim)]
     spatial_dims = " ".join(spatial_dim)
@@ -319,17 +327,27 @@ def generate_relative_coordinate_indices_nd(
         for dim, val in zip(spatial_dim, dimensions)
     ]
 
-    relative_indices = [index.unsqueeze(0) - index.unsqueeze(1) for index in indices]
+    relative_indices = [index.unsqueeze(1) - index.unsqueeze(0) for index in indices]
 
-    relative_indices_shifted = [
-        torch.clamp(index, -max_dist, max_dist) + max_dist + offset
-        for index, max_dist, offset in zip(relative_indices, max_distances, offsets)
-    ]
+    output_relative_indices = []
+    for i in range(ndim):
+        max_dist = float(max_distances_calc[i])  # Use the calculated max distance
+        rel_idx = relative_indices[i]
 
-    if normalise:
-        relative_indices_shifted = [
-            index / (max_dist - 1 if max_dist > 1 else max_dist)
-            for index, max_dist in zip(relative_indices, max_distances)
-        ]
+        if normalise:
+            # Normalize to [-1, 1]
+            if max_dist > 0:
+                normalized_idx = rel_idx / max_dist
+            else:
+                normalized_idx = torch.zeros_like(rel_idx)
+            # Clamp to ensure they are strictly within [-1, 1]
+            output_relative_indices.append(torch.clamp(normalized_idx, -1.0, 1.0))
+        else:
+            # Clamp to [-max_dist, max_dist] and shift to positive range [0, 2*max_dist]
+            # Keep as integer type for potential embedding lookup based on per-dim index
+            clamped_shifted_idx = torch.clamp(rel_idx, -max_dist, max_dist) + max_dist
+            output_relative_indices.append(
+                clamped_shifted_idx.long()
+            )  # Convert to long
 
-    torch.stack(relative_indices_shifted, dim=0).shape
+    return torch.stack(output_relative_indices, dim=0)

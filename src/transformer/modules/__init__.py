@@ -14,7 +14,7 @@ from .utils import (
     unshift_nd,
     generate_shift_nd_mask,
     generate_absolute_coordinates_nd,
-    generate_relative_attention_coordinates_nd,
+    generate_relative_coordinate_indices_nd,
 )
 
 __all__ = [
@@ -31,7 +31,7 @@ __all__ = [
     # UTILS
     "batch_nd",
     "generate_absolute_coordinates_nd",
-    "generate_relative_attention_coordinates_nd",
+    "generate_relative_coordinate_indices_nd",
     "generate_shift_nd_mask",
     "make_tuple_nd",
     "shift_nd",
