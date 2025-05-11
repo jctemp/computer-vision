@@ -22,17 +22,23 @@ class RelativePositionalEncoder(nn.Module):
         self.kernel_size = make_tuple_nd(kernel_size, ndim)
         self.heads = heads
         self.max_distance = (
-            [k - 1 for k in kernel_size]
+            [k - 1 for k in self.kernel_size]
             if max_distance is None
             else [
                 min(d, k)
-                for d, k in zip(make_tuple_nd(max_distance, ndim), kernel_size)
+                for d, k in zip(make_tuple_nd(max_distance, ndim), self.kernel_size)
             ]
         )
 
-    def get_indices(self, normalise=False) -> torch.Tensor:
+    def get_indices(
+        self, normalise: bool = False, device: Optional[torch.device] = None
+    ) -> torch.Tensor:
         return generate_relative_coordinate_indices_nd(
-            self.ndim, self.kernel_size, self.max_distance, normalise=normalise
+            self.ndim,
+            self.kernel_size,
+            self.max_distance,
+            normalise=normalise,
+            device=device,
         )
 
     def get_embeddings(self, _: torch.Tensor) -> torch.Tensor:
@@ -94,7 +100,7 @@ class ContinuousEncoder(RelativePositionalEncoder):
             torch.sign(indices)
             * torch.log2(1 + indices.abs())
             / torch.log2(torch.tensor(8))
-        )
+        ).permute(1, 2, 0)
         self.register_buffer("indices", log_indices)
 
         self._init_weights()

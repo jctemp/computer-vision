@@ -67,11 +67,13 @@ class WindowedAttentionBlockNd(nn.Module):
             drop_proj=drop_proj,
             enable_sampling=enable_sampling,
             rpe=rpe_type(
-                ndim,
+                self.ndim,
                 self.kernel_size,
                 heads,
                 self.max_distance,
-            ),
+            )
+            if rpe_type is not None
+            else None,
         )
         self.norm_attn = nn.LayerNorm(in_channels)
 
@@ -85,7 +87,7 @@ class WindowedAttentionBlockNd(nn.Module):
         self.norm_mlp = nn.LayerNorm(in_channels)
         self.drop_path = tvo.StochasticDepth(p=drop_path, mode="row")
 
-        self.mask: Dict[Tuple[int, ...], torch.BoolTensor] = {}
+        self.mask: Dict[Tuple[int, ...], torch.Tensor] = {}
 
         self._init_weights()
 

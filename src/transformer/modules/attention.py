@@ -18,7 +18,7 @@ class WindowedAttention(nn.Module):
         drop_attn: float = 0.1,
         drop_proj: float = 0.1,
         enable_sampling: bool = False,
-        rpe: RelativePositionalEncoder = None,
+        rpe: Optional[RelativePositionalEncoder] = None,
         keep_attn_weights: bool = False,
     ) -> None:
         super().__init__()
