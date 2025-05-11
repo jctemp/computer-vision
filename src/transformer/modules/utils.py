@@ -93,7 +93,7 @@ def unbatch_nd(
     ndim: int,
     kernel_size: Union[int, Sequence[int]],
     dimensions: Union[int, Sequence[int]],
-) -> Tuple[torch.Tensor, Sequence[int]]:
+) -> torch.Tensor:
     """
     Reverses the `batch_nd` operation, transforming patches back into
     spatial dimensions.
@@ -201,8 +201,8 @@ def generate_shift_nd_mask(
     kernel_size: Union[int, Sequence[int]],
     dimensions: Union[int, Sequence[int]],
     shift_size: Union[int, Sequence[int]],
-    device=None,
-) -> torch.BoolTensor:
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
     """
     Generates a batched shift mask for an ND-shape. Non-overlapping regions
     after a shift should not receive attention, hence a mask.
@@ -257,7 +257,7 @@ def generate_shift_nd_mask(
 def generate_absolute_coordinates_nd(
     ndim: int,
     dimensions: Union[int, Sequence[int]],
-    device=None,
+    device: Optional[torch.device] = None,
 ):
     """
     Generates absolute coordinates for an ND-shape. The output is a grid
@@ -290,7 +290,7 @@ def generate_relative_coordinate_indices_nd(
     dimensions: Union[int, Sequence[int]],
     max_distances: Optional[Union[int, Sequence[int]]] = None,
     normalise: bool = False,
-    device=None,
+    device: Optional[torch.device] = None,
 ) -> torch.Tensor:
     """
     The function generates based on the relative positions indices. These
