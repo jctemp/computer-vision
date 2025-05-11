@@ -107,12 +107,12 @@ class WindowedAttentionBlockNd(nn.Module):
         query: torch.Tensor,  # b c d h w
         key: Optional[torch.Tensor] = None,  # b c d h w
         value: Optional[torch.Tensor] = None,  # b c d h w
-        mask: Optional[torch.BoolTensor] = None,  # b d h w
+        mask: Optional[torch.Tensor] = None,  # b d h w
     ) -> torch.Tensor:
         input_spatial_dims = tuple(query.size()[2:])
 
-        external_mask: Optional[torch.BoolTensor] = None
-        cached_shift_mask: Optional[torch.BoolTensor] = None
+        external_mask: Optional[torch.Tensor] = None
+        cached_shift_mask: Optional[torch.Tensor] = None
 
         if key is None and value is None:
             key = query
@@ -164,6 +164,7 @@ class WindowedAttentionBlockNd(nn.Module):
                     self.kernel_size,
                     input_spatial_dims,
                     shift_size=self.shift_size,
+                    device=query.device,
                 )
                 self.mask[input_spatial_dims] = cached_shift_mask
 
